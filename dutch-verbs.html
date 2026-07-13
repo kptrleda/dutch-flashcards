@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verb Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0a1830;
+    --panel: #0f2242;
+    --panel-2: #132a4f;
+    --board: #0b1a30;
+    --yellow: #ffc917;
+    --yellow-dim: #a9860f;
+    --text: #f2efe6;
+    --text-dim: #8fa3c2;
+    --divider: rgba(255,255,255,0.08);
+    --danger: #e0654f;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--bg);
+    background-image:
+      radial-gradient(circle at 15% 0%, rgba(255,201,23,0.05), transparent 40%),
+      radial-gradient(circle at 85% 100%, rgba(255,201,23,0.04), transparent 45%);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 28px 16px 60px;
+  }
+  .app{ width: 100%; max-width: 560px; }
+
+  .board-header{
+    display:flex; align-items:flex-end; justify-content:space-between;
+    border-bottom: 3px solid var(--yellow);
+    padding-bottom: 10px; margin-bottom: 22px;
+  }
+  .board-header h1{
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 26px; letter-spacing: 0.5px; margin: 0;
+    color: var(--yellow);
+  }
+  .board-header .sub{
+    font-size: 12px; color: var(--text-dim); margin-top: 4px;
+    font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.5px;
+  }
+  .counter{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px; color: var(--text-dim); text-align: right;
+  }
+  .counter b{ color: var(--yellow); font-size: 16px; }
+
+  .empty{
+    background: var(--panel);
+    border: 1px solid var(--divider);
+    border-radius: 10px;
+    padding: 28px 22px;
+    text-align: center;
+  }
+  .empty p{ color: var(--text-dim); font-size: 14px; margin: 0 0 16px; }
+
+  .destination-label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px; color: var(--text-dim);
+    text-align:center; margin-bottom: 10px; letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .flap-wrap{ perspective: 1400px; margin-bottom: 18px; }
+  .flap-card{
+    position: relative;
+    height: 240px;
+    border-radius: 10px;
+    cursor: pointer;
+    transform-style: preserve-3d;
+    transition: transform 0.45s cubic-bezier(.4,.2,.2,1);
+  }
+  .flap-card.flipped{ transform: rotateX(180deg); }
+  .flap-face{
+    position:absolute; inset:0;
+    backface-visibility: hidden;
+    border-radius: 10px;
+    background: var(--board);
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 14px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
+    display:flex; align-items:center; justify-content:center;
+    flex-direction: column;
+    padding: 20px;
+  }
+  .flap-front .word{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight: 700;
+    font-size: clamp(24px, 7vw, 36px);
+    color: var(--yellow);
+    letter-spacing: 1px;
+    text-align: center;
+    word-break: break-word;
+  }
+  .lang-tag{
+    position:absolute; top: 12px; left: 14px;
+    font-size: 10px; letter-spacing: 1.5px;
+    color: var(--text-dim); font-family:'IBM Plex Mono', monospace;
+  }
+  .flap-back{ transform: rotateX(180deg); }
+  .verb-forms{ width:100%; }
+  .verb-row{
+    display:flex; justify-content:space-between; align-items:baseline;
+    padding: 9px 6px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .verb-row:last-child{ border-bottom: none; }
+  .verb-row .form-label{
+    font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--yellow-dim); font-family:'IBM Plex Mono', monospace;
+  }
+  .verb-row .form-word{
+    font-size: 18px; color: var(--text); font-family:'IBM Plex Mono', monospace;
+    font-weight: 600; text-align: right;
+  }
+
+  .tap-hint{
+    text-align:center; font-size: 11.5px; color: var(--text-dim);
+    font-family:'IBM Plex Mono', monospace; margin-bottom: 20px;
+  }
+
+  .controls{ display:flex; gap:10px; margin-bottom: 26px; }
+  .btn{
+    flex:1; padding: 12px; border-radius: 8px; border: none;
+    font-family:'Inter', sans-serif; font-weight: 600; font-size: 14px;
+    cursor:pointer; transition: all .15s ease;
+  }
+  .btn-primary{ background: var(--yellow); color:#17273f; }
+  .btn-primary:hover{ background:#ffd84d; }
+  .btn-ghost{ background: var(--panel); color: var(--text); border:1px solid var(--divider); }
+  .btn-ghost:hover{ background: var(--panel-2); }
+
+  .progress-track{
+    height: 4px; background: var(--panel); border-radius: 2px; margin-bottom: 30px; overflow:hidden;
+  }
+  .progress-fill{ height:100%; background: var(--yellow); transition: width .3s ease; }
+
+  .manage-toggle{
+    display:flex; align-items:center; justify-content:space-between;
+    cursor:pointer; padding: 12px 14px; background: var(--panel);
+    border: 1px solid var(--divider); border-radius: 8px;
+    font-size: 13.5px; font-weight: 600; color: var(--text-dim);
+  }
+  .manage-toggle span.arrow{ transition: transform .2s ease; }
+  .manage-toggle.open span.arrow{ transform: rotate(90deg); }
+  .manage-panel{ display:none; padding: 18px 4px 4px; }
+  .manage-panel.open{ display:block; }
+  .manage-panel textarea{
+    width:100%; min-height: 110px; background: var(--panel);
+    border: 1px solid var(--divider); border-radius: 8px; color: var(--text);
+    font-family:'IBM Plex Mono', monospace; font-size: 13px; padding: 12px;
+    resize: vertical; margin-bottom: 8px;
+  }
+  .manage-panel .hint{ font-size: 11.5px; color: var(--text-dim); margin-bottom: 12px; }
+  .word-list{ max-height: 240px; overflow-y:auto; margin-top: 16px; border-top: 1px solid var(--divider); }
+  .word-row{
+    display:flex; justify-content:space-between; align-items:center;
+    padding: 9px 4px; border-bottom: 1px solid var(--divider); font-size: 12.5px;
+  }
+  .word-row .pair{ font-family:'IBM Plex Mono', monospace; color: var(--text-dim); }
+  .word-row .pair b{ color: var(--text); font-weight:600; }
+  .word-row button{
+    background:none; border:none; color: var(--danger); cursor:pointer;
+    font-size: 12px; font-family:'Inter',sans-serif;
+  }
+  .clear-all{ margin-top: 12px; font-size: 12px; color: var(--danger); background:none; border:none; cursor:pointer; }
+
+  .ocr-row{ margin-bottom: 14px; }
+  .ocr-status{
+    font-size: 11.5px; color: var(--text-dim); margin-top: 8px;
+    font-family:'IBM Plex Mono', monospace; min-height: 14px;
+  }
+  .ocr-status.error{ color: var(--danger); }
+  .ocr-status.done{ color: var(--yellow); }
+
+  @media (max-width: 420px){ .flap-card{ height: 220px; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="board-header">
+    <div>
+      <h1>VERB BOARD</h1>
+      <div class="sub">irregular verbs, all aboard</div>
+    </div>
+    <div>
+      <div class="counter" id="counter"><b>0</b><br>verbs</div>
+      <div class="ocr-status" id="saveStatus" style="text-align:right; margin-top:4px;"></div>
+    </div>
+  </div>
+
+  <div id="emptyState" class="empty" style="display:none;">
+    <p>No verbs on the board yet. Add some below to get started.</p>
+  </div>
+
+  <div id="practiceArea" style="display:none;">
+    <div class="destination-label" id="destLabel">say all three Dutch forms out loud</div>
+
+    <div class="flap-wrap">
+      <div class="flap-card" id="flapCard">
+        <div class="flap-face flap-front">
+          <span class="lang-tag">EN</span>
+          <div class="word" id="frontWord">—</div>
+        </div>
+        <div class="flap-face flap-back">
+          <span class="lang-tag">NL</span>
+          <div class="verb-forms">
+            <div class="verb-row"><span class="form-label">Infinitief</span><span class="form-word" id="infWord">—</span></div>
+            <div class="verb-row"><span class="form-label">Imperfectum</span><span class="form-word" id="impWord">—</span></div>
+            <div class="verb-row"><span class="form-label">Perfectum</span><span class="form-word" id="perfWord">—</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tap-hint">tap the card to flip · space bar works too</div>
+
+    <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+
+    <div class="controls">
+      <button class="btn btn-ghost" id="prevBtn">← Previous</button>
+      <button class="btn btn-ghost" id="shuffleBtn">🔀 Shuffle</button>
+      <button class="btn btn-primary" id="nextBtn">Next →</button>
+    </div>
+  </div>
+
+  <div class="manage-toggle" id="manageToggle">
+    <span>Manage verbs</span>
+    <span class="arrow">▸</span>
+  </div>
+  <div class="manage-panel" id="managePanel">
+    <div class="ocr-row">
+      <input type="file" id="photoInput" accept="image/*" multiple capture="environment" style="display:none;">
+      <button class="btn btn-ghost" id="photoBtn" style="width:100%;">📷 Add photos of your book</button>
+      <div class="ocr-status" id="ocrStatus"></div>
+    </div>
+    <textarea id="bulkInput" placeholder="to go - gaan - ging - is gegaan&#10;to see - zien - zag - heeft gezien"></textarea>
+    <div class="hint">One verb per line: <b>english - infinitief - imperfectum - perfectum</b> (or use =, a colon, or a tab). Tip: after a photo, the recognized text appears above — check and fix it before adding.</div>
+    <button class="btn btn-primary" id="addWordsBtn" style="width:100%; margin-bottom: 8px;">Add to board</button>
+    <div class="ocr-status" id="addStatus"></div>
+    <div class="word-list" id="wordListEl"></div>
+    <div style="display:flex; gap:10px; margin-top:12px;">
+      <button class="btn btn-ghost" id="exportBtn" style="flex:1; font-size:12.5px; padding:9px;">📋 Copy backup of all verbs</button>
+      <button class="clear-all" id="clearAllBtn">Clear all</button>
+    </div>
+    <div class="ocr-status" id="exportStatus"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'verb-list';
+  let words = [];
+  let order = [];
+  let pos = 0;
+  let flipped = false;
+
+  const emptyState = document.getElementById('emptyState');
+  const practiceArea = document.getElementById('practiceArea');
+  const counter = document.getElementById('counter');
+  const flapCard = document.getElementById('flapCard');
+  const frontWord = document.getElementById('frontWord');
+  const infWord = document.getElementById('infWord');
+  const impWord = document.getElementById('impWord');
+  const perfWord = document.getElementById('perfWord');
+  const progressFill = document.getElementById('progressFill');
+  const wordListEl = document.getElementById('wordListEl');
+  const manageToggle = document.getElementById('manageToggle');
+  const managePanel = document.getElementById('managePanel');
+  const bulkInputEl = document.getElementById('bulkInput');
+  const photoInput = document.getElementById('photoInput');
+  const photoBtn = document.getElementById('photoBtn');
+  const ocrStatus = document.getElementById('ocrStatus');
+  let tesseractLoading = null;
+
+  function shuffle(arr){
+    const a = arr.slice();
+    for(let i=a.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [a[i],a[j]]=[a[j],a[i]];
+    }
+    return a;
+  }
+
+  function buildOrder(){
+    order = shuffle(words.map((_,i)=>i));
+    pos = 0;
+    flipped = false;
+  }
+
+  function render(){
+    counter.innerHTML = '<b>'+words.length+'</b><br>verbs';
+    if(words.length === 0){
+      emptyState.style.display = 'block';
+      practiceArea.style.display = 'none';
+      renderWordList();
+      return;
+    }
+    emptyState.style.display = 'none';
+    practiceArea.style.display = 'block';
+
+    if(order.length !== words.length) buildOrder();
+    if(pos >= order.length) pos = 0;
+
+    const w = words[order[pos]];
+    frontWord.textContent = w.en;
+    infWord.textContent = w.inf;
+    impWord.textContent = w.imp;
+    perfWord.textContent = w.perf;
+
+    flapCard.classList.toggle('flipped', flipped);
+    progressFill.style.width = ((pos+1)/order.length*100) + '%';
+
+    renderWordList();
+  }
+
+  function renderWordList(){
+    wordListEl.innerHTML = '';
+    words.forEach((w, i) => {
+      const row = document.createElement('div');
+      row.className = 'word-row';
+      row.innerHTML = '<span class="pair"><b>'+escapeHtml(w.en)+'</b> — '+escapeHtml(w.inf)+' / '+escapeHtml(w.imp)+' / '+escapeHtml(w.perf)+'</span>';
+      const btn = document.createElement('button');
+      btn.textContent = 'delete';
+      btn.onclick = () => removeWord(i);
+      row.appendChild(btn);
+      wordListEl.appendChild(row);
+    });
+  }
+
+  function escapeHtml(s){
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function removeWord(i){
+    words.splice(i,1);
+    save();
+    order = [];
+    render();
+  }
+
+  async function storageGet(key){
+    let fromCloud = null, fromLocal = null;
+    try{
+      if(window.storage && typeof window.storage.get === 'function'){
+        const res = await window.storage.get(key, false);
+        fromCloud = res ? res.value : null;
+      }
+    }catch(e){ /* ignore, try local too */ }
+    try{ fromLocal = localStorage.getItem(key); }catch(e){ /* ignore */ }
+    return fromCloud || fromLocal || null;
+  }
+
+  async function storageSet(key, value){
+    let ok = false;
+    try{
+      if(window.storage && typeof window.storage.set === 'function'){
+        await window.storage.set(key, value, false);
+        ok = true;
+      }
+    }catch(e){ /* try the other backend too */ }
+    try{
+      localStorage.setItem(key, value);
+      ok = true;
+    }catch(e){ /* ignore, judged by ok flag */ }
+    if(!ok) throw new Error('Both storage backends failed');
+  }
+
+  async function save(){
+    const saveStatus = document.getElementById('saveStatus');
+    try{
+      await storageSet(STORAGE_KEY, JSON.stringify(words));
+      if(saveStatus){
+        saveStatus.className = 'ocr-status done';
+        saveStatus.textContent = 'saved ✓';
+        setTimeout(() => { if(saveStatus.textContent === 'saved ✓') saveStatus.textContent = ''; }, 2500);
+      }
+    }catch(e){
+      console.error('Save failed', e);
+      if(saveStatus){
+        saveStatus.className = 'ocr-status error';
+        saveStatus.textContent = 'save failed — use "copy backup"';
+      }
+    }
+  }
+
+  async function load(){
+    try{
+      const value = await storageGet(STORAGE_KEY);
+      if(value){ words = JSON.parse(value); }
+    }catch(e){ words = []; }
+    render();
+  }
+
+  function parseLine(line){
+    let parts = null;
+    if(line.includes(' - ')) parts = line.split(' - ');
+    else if(line.includes(' – ')) parts = line.split(' – ');
+    else if(line.includes(' — ')) parts = line.split(' — ');
+    else if(line.includes('\t')) parts = line.split('\t');
+    else if(line.includes('=')) parts = line.split('=');
+    else if(line.includes(':')) parts = line.split(':');
+    else if(line.includes('|')) parts = line.split('|');
+    else if(line.includes(',')) parts = line.split(',');
+    if(!parts || parts.length < 4) return null;
+    const en = parts[0].trim();
+    const inf = parts[1].trim();
+    const imp = parts[2].trim();
+    let perf = parts.slice(3).join(' ').trim();
+    perf = perf.replace(/\s*\[[^\]]*\]\s*$/, '').trim();
+    if(!en || !inf || !imp || !perf) return null;
+    return {en, inf, imp, perf};
+  }
+
+  function ensureTesseractLoaded(){
+    if(window.Tesseract) return Promise.resolve();
+    if(tesseractLoading) return tesseractLoading;
+    tesseractLoading = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js';
+      s.onload = () => resolve();
+      s.onerror = () => { tesseractLoading = null; reject(new Error('load-failed')); };
+      document.head.appendChild(s);
+    });
+    return tesseractLoading;
+  }
+
+  photoBtn.addEventListener('click', () => photoInput.click());
+
+  photoInput.addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files || []);
+    if(files.length === 0) return;
+
+    photoBtn.disabled = true;
+    ocrStatus.className = 'ocr-status';
+    ocrStatus.textContent = 'Loading text reader...';
+
+    try{
+      await ensureTesseractLoaded();
+    }catch(err){
+      ocrStatus.className = 'ocr-status error';
+      ocrStatus.textContent = 'Could not load the OCR library. Check your internet connection and try again.';
+      photoBtn.disabled = false;
+      photoInput.value = '';
+      return;
+    }
+
+    let combinedText = '';
+    for(let i = 0; i < files.length; i++){
+      ocrStatus.className = 'ocr-status';
+      ocrStatus.textContent = `Reading photo ${i+1} of ${files.length}...`;
+      try{
+        const result = await window.Tesseract.recognize(files[i], 'eng+nld', {
+          logger: (m) => {
+            if(m.status === 'recognizing text'){
+              ocrStatus.textContent = `Photo ${i+1} of ${files.length}: ${Math.round(m.progress*100)}%`;
+            }
+          }
+        });
+        combinedText += result.data.text.trim() + '\n';
+      }catch(err){
+        combinedText += `[photo ${i+1}: could not be read]\n`;
+      }
+    }
+
+    bulkInputEl.value = (bulkInputEl.value ? bulkInputEl.value.trim() + '\n' : '') + combinedText.trim();
+    ocrStatus.className = 'ocr-status done';
+    ocrStatus.textContent = 'Done — check and fix the text above, and format each line as "english - infinitief - imperfectum - perfectum" before adding.';
+    managePanel.classList.add('open');
+    manageToggle.classList.add('open');
+    photoBtn.disabled = false;
+    photoInput.value = '';
+  });
+
+  document.getElementById('addWordsBtn').addEventListener('click', () => {
+    const raw = bulkInputEl.value;
+    const addStatus = document.getElementById('addStatus');
+    const lines = raw.split('\n').map(l=>l.trim()).filter(Boolean);
+
+    if(lines.length === 0){
+      addStatus.className = 'ocr-status error';
+      addStatus.textContent = 'Paste or type some verbs in the box above first.';
+      return;
+    }
+
+    let added = 0, skippedDupe = 0, unparsed = 0;
+    lines.forEach(line => {
+      const v = parseLine(line);
+      if(!v){ unparsed++; return; }
+      const exists = words.some(w => w.en.toLowerCase()===v.en.toLowerCase() && w.inf.toLowerCase()===v.inf.toLowerCase());
+      if(exists){ skippedDupe++; return; }
+      words.push(v);
+      added++;
+    });
+
+    if(added > 0){
+      bulkInputEl.value = '';
+      save();
+      order = [];
+      render();
+    }
+
+    if(unparsed > 0 && added === 0){
+      addStatus.className = 'ocr-status error';
+      addStatus.textContent = `No lines recognized (${unparsed} line(s) skipped). Use the format "english - infinitief - imperfectum - perfectum" per line.`;
+    } else if(added === 0 && skippedDupe > 0){
+      addStatus.className = 'ocr-status error';
+      addStatus.textContent = `All ${skippedDupe} verb(s) are already on the board.`;
+    } else {
+      addStatus.className = 'ocr-status done';
+      let msg = `${added} verb(s) added.`;
+      if(unparsed > 0) msg += ` ${unparsed} line(s) not recognized.`;
+      if(skippedDupe > 0) msg += ` ${skippedDupe} already on the board.`;
+      addStatus.textContent = msg;
+    }
+  });
+
+  document.getElementById('clearAllBtn').addEventListener('click', () => {
+    if(confirm('Are you sure you want to clear all verbs?')){
+      words = [];
+      save();
+      order = [];
+      render();
+    }
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', async () => {
+    const exportStatus = document.getElementById('exportStatus');
+    if(words.length === 0){
+      exportStatus.className = 'ocr-status error';
+      exportStatus.textContent = 'No verbs to back up yet.';
+      return;
+    }
+    const text = words.map(w => `${w.en} - ${w.inf} - ${w.imp} - ${w.perf}`).join('\n');
+    try{
+      await navigator.clipboard.writeText(text);
+      exportStatus.className = 'ocr-status done';
+      exportStatus.textContent = `Copied ${words.length} verbs to clipboard. Paste them somewhere safe (Notes app, email to yourself, etc).`;
+    }catch(e){
+      bulkInputEl.value = text;
+      managePanel.classList.add('open');
+      manageToggle.classList.add('open');
+      exportStatus.className = 'ocr-status error';
+      exportStatus.textContent = 'Could not copy automatically — your verbs are in the text box above, select and copy manually.';
+    }
+  });
+
+  manageToggle.addEventListener('click', () => {
+    managePanel.classList.toggle('open');
+    manageToggle.classList.toggle('open');
+  });
+
+  flapCard.addEventListener('click', () => {
+    flipped = !flipped;
+    flapCard.classList.toggle('flipped', flipped);
+  });
+
+  document.getElementById('nextBtn').addEventListener('click', () => {
+    pos = (pos+1) % order.length;
+    flipped = false;
+    render();
+  });
+  document.getElementById('prevBtn').addEventListener('click', () => {
+    pos = (pos-1 + order.length) % order.length;
+    flipped = false;
+    render();
+  });
+  document.getElementById('shuffleBtn').addEventListener('click', () => {
+    buildOrder();
+    render();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if(practiceArea.style.display === 'none') return;
+    if(e.code === 'Space'){ e.preventDefault(); flipped = !flipped; flapCard.classList.toggle('flipped', flipped); }
+    else if(e.code === 'ArrowRight'){ pos = (pos+1) % order.length; flipped = false; render(); }
+    else if(e.code === 'ArrowLeft'){ pos = (pos-1+order.length) % order.length; flipped = false; render(); }
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

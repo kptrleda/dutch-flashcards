@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Word Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0a1830;
+    --panel: #0f2242;
+    --panel-2: #132a4f;
+    --board: #0b1a30;
+    --yellow: #ffc917;
+    --yellow-dim: #a9860f;
+    --text: #f2efe6;
+    --text-dim: #8fa3c2;
+    --divider: rgba(255,255,255,0.08);
+    --danger: #e0654f;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--bg);
+    background-image:
+      radial-gradient(circle at 15% 0%, rgba(255,201,23,0.05), transparent 40%),
+      radial-gradient(circle at 85% 100%, rgba(255,201,23,0.04), transparent 45%);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 28px 16px 60px;
+  }
+  .app{ width: 100%; max-width: 560px; }
+
+  /* Header */
+  .board-header{
+    display:flex; align-items:flex-end; justify-content:space-between;
+    border-bottom: 3px solid var(--yellow);
+    padding-bottom: 10px; margin-bottom: 22px;
+  }
+  .board-header h1{
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 26px; letter-spacing: 0.5px; margin: 0;
+    color: var(--yellow);
+  }
+  .board-header .sub{
+    font-size: 12px; color: var(--text-dim); margin-top: 4px;
+    font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.5px;
+  }
+  .counter{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px; color: var(--text-dim); text-align: right;
+  }
+  .counter b{ color: var(--yellow); font-size: 16px; }
+
+  /* Empty state */
+  .empty{
+    background: var(--panel);
+    border: 1px solid var(--divider);
+    border-radius: 10px;
+    padding: 28px 22px;
+    text-align: center;
+  }
+  .empty p{ color: var(--text-dim); font-size: 14px; margin: 0 0 16px; }
+
+  /* Practice area */
+  .direction-row{
+    display:flex; gap:8px; margin-bottom: 16px;
+  }
+  .seg{
+    flex:1; text-align:center; padding: 9px 6px; font-size: 12.5px;
+    font-family:'IBM Plex Mono', monospace; letter-spacing: 0.3px;
+    color: var(--text-dim); background: var(--panel);
+    border: 1px solid var(--divider); cursor: pointer;
+    border-radius: 6px; user-select:none;
+    transition: all .15s ease;
+  }
+  .seg.active{ background: var(--yellow); color: #17273f; border-color: var(--yellow); font-weight:600; }
+
+  .destination-label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px; color: var(--text-dim);
+    text-align:center; margin-bottom: 10px; letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .flap-wrap{
+    perspective: 1400px;
+    margin-bottom: 18px;
+  }
+  .flap-card{
+    position: relative;
+    height: 220px;
+    border-radius: 10px;
+    cursor: pointer;
+    transform-style: preserve-3d;
+    transition: transform 0.45s cubic-bezier(.4,.2,.2,1);
+  }
+  .flap-card.flipped{ transform: rotateX(180deg); }
+  .flap-face{
+    position:absolute; inset:0;
+    backface-visibility: hidden;
+    border-radius: 10px;
+    background: var(--board);
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 14px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
+    display:flex; align-items:center; justify-content:center;
+    flex-direction: column;
+    padding: 20px;
+  }
+  .flap-face::after{
+    content:""; position:absolute; left:0; right:0; top:50%;
+    height:1px; background: rgba(0,0,0,0.5);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.03);
+  }
+  .flap-face .word{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight: 700;
+    font-size: clamp(24px, 7vw, 38px);
+    color: var(--yellow);
+    letter-spacing: 1px;
+    text-align: center;
+    word-break: break-word;
+  }
+  .flap-face .lang-tag{
+    position:absolute; top: 12px; left: 14px;
+    font-size: 10px; letter-spacing: 1.5px;
+    color: var(--text-dim); font-family:'IBM Plex Mono', monospace;
+  }
+  .flap-back{ transform: rotateX(180deg); }
+  .flap-back .word{ color: var(--text); }
+
+  .tap-hint{
+    text-align:center; font-size: 11.5px; color: var(--text-dim);
+    font-family:'IBM Plex Mono', monospace; margin-bottom: 20px;
+  }
+
+  .controls{
+    display:flex; gap:10px; margin-bottom: 26px;
+  }
+  .btn{
+    flex:1; padding: 12px; border-radius: 8px; border: none;
+    font-family:'Inter', sans-serif; font-weight: 600; font-size: 14px;
+    cursor:pointer; transition: all .15s ease;
+  }
+  .btn-primary{ background: var(--yellow); color:#17273f; }
+  .btn-primary:hover{ background:#ffd84d; }
+  .btn-ghost{ background: var(--panel); color: var(--text); border:1px solid var(--divider); }
+  .btn-ghost:hover{ background: var(--panel-2); }
+
+  .progress-track{
+    height: 4px; background: var(--panel); border-radius: 2px; margin-bottom: 30px; overflow:hidden;
+  }
+  .progress-fill{ height:100%; background: var(--yellow); transition: width .3s ease; }
+
+  /* Manage panel */
+  .manage-toggle{
+    display:flex; align-items:center; justify-content:space-between;
+    cursor:pointer; padding: 12px 14px; background: var(--panel);
+    border: 1px solid var(--divider); border-radius: 8px;
+    font-size: 13.5px; font-weight: 600; color: var(--text-dim);
+  }
+  .manage-toggle span.arrow{ transition: transform .2s ease; }
+  .manage-toggle.open span.arrow{ transform: rotate(90deg); }
+  .manage-panel{
+    display:none; padding: 18px 4px 4px;
+  }
+  .manage-panel.open{ display:block; }
+  .manage-panel textarea{
+    width:100%; min-height: 110px; background: var(--panel);
+    border: 1px solid var(--divider); border-radius: 8px; color: var(--text);
+    font-family:'IBM Plex Mono', monospace; font-size: 13px; padding: 12px;
+    resize: vertical; margin-bottom: 8px;
+  }
+  .manage-panel .hint{ font-size: 11.5px; color: var(--text-dim); margin-bottom: 12px; }
+  .word-list{
+    max-height: 220px; overflow-y:auto; margin-top: 16px;
+    border-top: 1px solid var(--divider);
+  }
+  .word-row{
+    display:flex; justify-content:space-between; align-items:center;
+    padding: 9px 4px; border-bottom: 1px solid var(--divider);
+    font-size: 13px;
+  }
+  .word-row .pair{ font-family:'IBM Plex Mono', monospace; color: var(--text-dim); }
+  .word-row .pair b{ color: var(--text); font-weight:600; }
+  .word-row button{
+    background:none; border:none; color: var(--danger); cursor:pointer;
+    font-size: 12px; font-family:'Inter',sans-serif;
+  }
+  .clear-all{ margin-top: 12px; font-size: 12px; color: var(--danger); background:none; border:none; cursor:pointer; }
+
+  .chapter-field{
+    width:100%; padding: 10px 12px; margin-bottom: 14px;
+    background: var(--panel); border: 1px solid var(--divider); border-radius: 8px;
+    color: var(--text); font-family:'Inter', sans-serif; font-size: 13.5px;
+  }
+  .chapter-field::placeholder{ color: var(--text-dim); }
+
+  .chip-label{
+    font-size: 11px; color: var(--text-dim); text-transform: uppercase;
+    letter-spacing: 1px; font-family:'IBM Plex Mono', monospace; margin-bottom: 8px;
+  }
+  .chip-row{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom: 18px; }
+  .chip{
+    padding: 7px 13px; font-size: 12.5px; border-radius: 20px;
+    background: var(--panel); border: 1px solid var(--divider); color: var(--text-dim);
+    cursor:pointer; font-family:'IBM Plex Mono', monospace; user-select:none;
+    transition: all .15s ease;
+  }
+  .chip.active{ background: var(--yellow); color:#17273f; border-color: var(--yellow); font-weight:600; }
+
+  .chapter-tag{
+    position:absolute; top: 12px; right: 14px;
+    font-size: 10px; letter-spacing: 0.5px;
+    color: var(--yellow-dim); font-family:'IBM Plex Mono', monospace;
+  }
+
+  .word-row .chtag{ color: var(--yellow-dim); margin-right: 4px; }
+
+  .ocr-row{ margin-bottom: 14px; }
+  .ocr-status{
+    font-size: 11.5px; color: var(--text-dim); margin-top: 8px;
+    font-family:'IBM Plex Mono', monospace; min-height: 14px;
+  }
+  .ocr-status.error{ color: var(--danger); }
+  .ocr-status.done{ color: var(--yellow); }
+
+  @media (max-width: 420px){
+    .flap-card{ height: 190px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="board-header">
+    <div>
+      <h1>WORD BOARD</h1>
+      <div class="sub">departures for your exam</div>
+    </div>
+    <div class="counter" id="counter"><b>0</b><br>words</div>
+    <div class="ocr-status" id="saveStatus" style="text-align:right; margin-top:4px;"></div>
+  </div>
+
+  <div id="emptyState" class="empty" style="display:none;">
+    <p>No words on the board yet. Add some below to get started.</p>
+  </div>
+
+  <div id="practiceArea" style="display:none;">
+    <div class="chip-label">Chapters</div>
+    <div class="chip-row" id="chapterChips"></div>
+
+    <div class="direction-row" id="directionRow">
+      <div class="seg active" data-dir="en-nl">EN → NL</div>
+      <div class="seg" data-dir="nl-en">NL → EN</div>
+      <div class="seg" data-dir="mixed">MIXED</div>
+    </div>
+
+    <div id="noMatchMsg" class="empty" style="display:none; margin-bottom: 26px;">
+      <p style="margin:0;">No words in the selected chapters. Pick a different chapter above.</p>
+    </div>
+
+    <div id="playArea">
+      <div class="destination-label" id="destLabel">say the Dutch word out loud</div>
+
+      <div class="flap-wrap">
+        <div class="flap-card" id="flapCard">
+          <div class="flap-face flap-front">
+            <span class="lang-tag" id="frontTag">EN</span>
+            <span class="chapter-tag" id="frontChTag"></span>
+            <div class="word" id="frontWord">—</div>
+          </div>
+          <div class="flap-face flap-back flap-back-inner">
+            <span class="lang-tag" id="backTag">NL</span>
+            <span class="chapter-tag" id="backChTag"></span>
+            <div class="word" id="backWord">—</div>
+          </div>
+        </div>
+      </div>
+      <div class="tap-hint">tap the card to flip · space bar works too</div>
+
+      <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+
+      <div class="controls">
+        <button class="btn btn-ghost" id="prevBtn">← Previous</button>
+        <button class="btn btn-ghost" id="shuffleBtn">🔀 Shuffle</button>
+        <button class="btn btn-primary" id="nextBtn">Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="manage-toggle" id="manageToggle">
+    <span>Manage words</span>
+    <span class="arrow">▸</span>
+  </div>
+  <div class="manage-panel" id="managePanel">
+    <input type="text" id="chapterField" class="chapter-field" placeholder="Chapter for these words (e.g. 14) — leave blank for 'other'">
+    <div class="ocr-row">
+      <input type="file" id="photoInput" accept="image/*" multiple capture="environment" style="display:none;">
+      <button class="btn btn-ghost" id="photoBtn" style="width:100%;">📷 Add photos of your book</button>
+      <div class="ocr-status" id="ocrStatus"></div>
+    </div>
+    <textarea id="bulkInput" placeholder="hallo - hello&#10;tot ziens - goodbye&#10;dank je wel - thank you"></textarea>
+    <div class="hint">One pair per line: <b>dutch - english</b> (or use =, a colon, or a tab). Tip: after a photo, the recognized text appears above — check and fix it before adding.</div>
+    <button class="btn btn-primary" id="addWordsBtn" style="width:100%; margin-bottom: 8px;">Add to board</button>
+    <div class="ocr-status" id="addStatus"></div>
+    <div class="word-list" id="wordListEl"></div>
+    <div style="display:flex; gap:10px; margin-top:12px;">
+      <button class="btn btn-ghost" id="exportBtn" style="flex:1; font-size:12.5px; padding:9px;">📋 Copy backup of all words</button>
+      <button class="clear-all" id="clearAllBtn">Clear all</button>
+    </div>
+    <div class="ocr-status" id="exportStatus"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'vocab-list';
+  let words = [];
+  let order = [];
+  let pos = 0;
+  let flipped = false;
+  let direction = 'en-nl';
+  let selectedChapters = new Set();
+  let knownChapters = new Set();
+
+  const emptyState = document.getElementById('emptyState');
+  const practiceArea = document.getElementById('practiceArea');
+  const counter = document.getElementById('counter');
+  const flapCard = document.getElementById('flapCard');
+  const frontWord = document.getElementById('frontWord');
+  const backWord = document.getElementById('backWord');
+  const frontTag = document.getElementById('frontTag');
+  const backTag = document.getElementById('backTag');
+  const frontChTag = document.getElementById('frontChTag');
+  const backChTag = document.getElementById('backChTag');
+  const destLabel = document.getElementById('destLabel');
+  const progressFill = document.getElementById('progressFill');
+  const wordListEl = document.getElementById('wordListEl');
+  const manageToggle = document.getElementById('manageToggle');
+  const managePanel = document.getElementById('managePanel');
+  const chapterChips = document.getElementById('chapterChips');
+  const noMatchMsg = document.getElementById('noMatchMsg');
+  const playArea = document.getElementById('playArea');
+  const chapterField = document.getElementById('chapterField');
+
+  function chapterOf(w){ return w.chapter || 'other'; }
+  function chapterLabel(c){ return /^\d+$/.test(c) ? ('H'+c) : c; }
+
+  function getChapters(){
+    const set = new Set(words.map(chapterOf));
+    return Array.from(set).sort((a,b) => {
+      const na = parseFloat(a), nb = parseFloat(b);
+      if(!isNaN(na) && !isNaN(nb)) return na - nb;
+      if(!isNaN(na)) return -1;
+      if(!isNaN(nb)) return 1;
+      return a.localeCompare(b);
+    });
+  }
+
+  function renderChapterChips(){
+    const chapters = getChapters();
+    chapters.forEach(c => {
+      if(!knownChapters.has(c)){
+        selectedChapters.add(c);
+        knownChapters.add(c);
+      }
+    });
+    Array.from(selectedChapters).forEach(c => { if(!chapters.includes(c)) selectedChapters.delete(c); });
+    Array.from(knownChapters).forEach(c => { if(!chapters.includes(c)) knownChapters.delete(c); });
+
+    chapterChips.innerHTML = '';
+    const allChip = document.createElement('div');
+    allChip.className = 'chip' + (selectedChapters.size === chapters.length ? ' active' : '');
+    allChip.textContent = 'All';
+    allChip.onclick = () => {
+      chapters.forEach(c => selectedChapters.add(c));
+      order = [];
+      render();
+    };
+    chapterChips.appendChild(allChip);
+
+    chapters.forEach(c => {
+      const chip = document.createElement('div');
+      chip.className = 'chip' + (selectedChapters.has(c) ? ' active' : '');
+      chip.textContent = chapterLabel(c);
+      chip.onclick = () => {
+        if(selectedChapters.has(c)){
+          if(selectedChapters.size > 1) selectedChapters.delete(c);
+        } else {
+          selectedChapters.add(c);
+        }
+        order = [];
+        render();
+      };
+      chapterChips.appendChild(chip);
+    });
+  }
+
+  function shuffle(arr){
+    const a = arr.slice();
+    for(let i=a.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [a[i],a[j]]=[a[j],a[i]];
+    }
+    return a;
+  }
+
+  function buildOrder(){
+    const filtered = words.map((_,i)=>i).filter(i => selectedChapters.has(chapterOf(words[i])));
+    const idxs = shuffle(filtered);
+    order = idxs.map(i => ({
+      idx: i,
+      dir: direction === 'mixed' ? (Math.random() < 0.5 ? 'en-nl' : 'nl-en') : direction
+    }));
+    pos = 0;
+    flipped = false;
+  }
+
+  function render(){
+    counter.innerHTML = '<b>'+words.length+'</b><br>words';
+    if(words.length === 0){
+      emptyState.style.display = 'block';
+      practiceArea.style.display = 'none';
+      return;
+    }
+    emptyState.style.display = 'none';
+    practiceArea.style.display = 'block';
+
+    renderChapterChips();
+
+    const filteredCount = words.filter(w => selectedChapters.has(chapterOf(w))).length;
+    if(order.length === 0 && filteredCount > 0) buildOrder();
+    if(pos >= order.length) pos = 0;
+
+    if(filteredCount === 0 || order.length === 0){
+      noMatchMsg.style.display = 'block';
+      playArea.style.display = 'none';
+      renderWordList();
+      return;
+    }
+    noMatchMsg.style.display = 'none';
+    playArea.style.display = 'block';
+
+    const item = order[pos];
+    const pair = words[item.idx];
+    const qWord = item.dir === 'en-nl' ? pair.en : pair.nl;
+    const aWord = item.dir === 'en-nl' ? pair.nl : pair.en;
+    const qTag = item.dir === 'en-nl' ? 'EN' : 'NL';
+    const aTag = item.dir === 'en-nl' ? 'NL' : 'EN';
+    const chLabel = chapterLabel(chapterOf(pair));
+
+    frontWord.textContent = qWord;
+    backWord.textContent = aWord;
+    frontTag.textContent = qTag;
+    backTag.textContent = aTag;
+    frontChTag.textContent = chLabel;
+    backChTag.textContent = chLabel;
+    destLabel.textContent = item.dir === 'en-nl' ? 'say the Dutch word out loud' : 'say the English word out loud';
+
+    flapCard.classList.toggle('flipped', flipped);
+    progressFill.style.width = ((pos+1)/order.length*100) + '%';
+
+    renderWordList();
+  }
+
+  function renderWordList(){
+    wordListEl.innerHTML = '';
+    words.forEach((w, i) => {
+      const row = document.createElement('div');
+      row.className = 'word-row';
+      row.innerHTML = '<span class="pair"><span class="chtag">['+escapeHtml(chapterLabel(chapterOf(w)))+']</span> <b>'+escapeHtml(w.en)+'</b> — '+escapeHtml(w.nl)+'</span>';
+      const btn = document.createElement('button');
+      btn.textContent = 'delete';
+      btn.onclick = () => removeWord(i);
+      row.appendChild(btn);
+      wordListEl.appendChild(row);
+    });
+  }
+
+  function escapeHtml(s){
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function removeWord(i){
+    words.splice(i,1);
+    save();
+    order = [];
+    render();
+  }
+
+  async function storageGet(key){
+    let fromCloud = null, fromLocal = null;
+    try{
+      if(window.storage && typeof window.storage.get === 'function'){
+        const res = await window.storage.get(key, false);
+        fromCloud = res ? res.value : null;
+      }
+    }catch(e){ /* ignore, try local too */ }
+    try{ fromLocal = localStorage.getItem(key); }catch(e){ /* ignore */ }
+    return fromCloud || fromLocal || null;
+  }
+
+  async function storageSet(key, value){
+    let ok = false;
+    try{
+      if(window.storage && typeof window.storage.set === 'function'){
+        await window.storage.set(key, value, false);
+        ok = true;
+      }
+    }catch(e){ /* try the other backend too */ }
+    try{
+      localStorage.setItem(key, value);
+      ok = true;
+    }catch(e){ /* ignore, judged by ok flag */ }
+    if(!ok) throw new Error('Both storage backends failed');
+  }
+
+  async function save(){
+    const saveStatus = document.getElementById('saveStatus');
+    try{
+      await storageSet(STORAGE_KEY, JSON.stringify(words));
+      if(saveStatus){
+        saveStatus.className = 'ocr-status done';
+        saveStatus.textContent = 'saved ✓';
+        setTimeout(() => { if(saveStatus.textContent === 'saved ✓') saveStatus.textContent = ''; }, 2500);
+      }
+    }catch(e){
+      console.error('Save failed', e);
+      if(saveStatus){
+        saveStatus.className = 'ocr-status error';
+        saveStatus.textContent = 'save failed — use "copy backup" below';
+      }
+    }
+  }
+
+  async function load(){
+    try{
+      const value = await storageGet(STORAGE_KEY);
+      if(value){
+        words = JSON.parse(value);
+      }
+    }catch(e){
+      words = [];
+    }
+    render();
+  }
+
+  function parseLine(line){
+    let parts = null;
+    if(line.includes(' - ')) parts = line.split(' - ');
+    else if(line.includes(' – ')) parts = line.split(' – ');
+    else if(line.includes(' — ')) parts = line.split(' — ');
+    else if(line.includes('\t')) parts = line.split('\t');
+    else if(line.includes('=')) parts = line.split('=');
+    else if(line.includes(':')) parts = line.split(':');
+    else if(line.includes('|')) parts = line.split('|');
+    else if(line.includes(',')) parts = line.split(',');
+    else if((line.match(/-/g) || []).length === 1) parts = line.split('-');
+    if(!parts || parts.length < 2) return null;
+    const nl = parts[0].trim();
+    let en = parts.slice(1).join(' ').trim();
+    en = en.replace(/\s*\[[^\]]*\]\s*$/, '').trim();
+    if(!en || !nl) return null;
+    return {en, nl};
+  }
+
+  const bulkInputEl = document.getElementById('bulkInput');
+  const photoInput = document.getElementById('photoInput');
+  const photoBtn = document.getElementById('photoBtn');
+  const ocrStatus = document.getElementById('ocrStatus');
+  let tesseractLoading = null;
+
+  function ensureTesseractLoaded(){
+    if(window.Tesseract) return Promise.resolve();
+    if(tesseractLoading) return tesseractLoading;
+    tesseractLoading = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js';
+      s.onload = () => resolve();
+      s.onerror = () => { tesseractLoading = null; reject(new Error('load-failed')); };
+      document.head.appendChild(s);
+    });
+    return tesseractLoading;
+  }
+
+  photoBtn.addEventListener('click', () => photoInput.click());
+
+  photoInput.addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files || []);
+    if(files.length === 0) return;
+
+    photoBtn.disabled = true;
+    ocrStatus.className = 'ocr-status';
+    ocrStatus.textContent = 'Loading text reader...';
+
+    try{
+      await ensureTesseractLoaded();
+    }catch(err){
+      ocrStatus.className = 'ocr-status error';
+      ocrStatus.textContent = 'Could not load the OCR library. Check your internet connection and try again.';
+      photoBtn.disabled = false;
+      photoInput.value = '';
+      return;
+    }
+
+    let combinedText = '';
+    for(let i = 0; i < files.length; i++){
+      ocrStatus.className = 'ocr-status';
+      ocrStatus.textContent = `Reading photo ${i+1} of ${files.length}...`;
+      try{
+        const result = await window.Tesseract.recognize(files[i], 'eng+nld', {
+          logger: (m) => {
+            if(m.status === 'recognizing text'){
+              ocrStatus.textContent = `Photo ${i+1} of ${files.length}: ${Math.round(m.progress*100)}%`;
+            }
+          }
+        });
+        combinedText += result.data.text.trim() + '\n';
+      }catch(err){
+        combinedText += `[photo ${i+1}: could not be read]\n`;
+      }
+    }
+
+    bulkInputEl.value = (bulkInputEl.value ? bulkInputEl.value.trim() + '\n' : '') + combinedText.trim();
+    ocrStatus.className = 'ocr-status done';
+    ocrStatus.textContent = 'Done — check and fix the text above, and format each line as "dutch - english" before adding.';
+    managePanel.classList.add('open');
+    manageToggle.classList.add('open');
+    photoBtn.disabled = false;
+    photoInput.value = '';
+  });
+
+  document.getElementById('addWordsBtn').addEventListener('click', () => {
+    const raw = document.getElementById('bulkInput').value;
+    const chapter = chapterField.value.trim() || 'other';
+    const addStatus = document.getElementById('addStatus');
+    const lines = raw.split('\n').map(l=>l.trim()).filter(Boolean);
+
+    if(lines.length === 0){
+      addStatus.className = 'ocr-status error';
+      addStatus.textContent = 'Paste or type some word pairs in the box above first.';
+      return;
+    }
+
+    let added = 0, skippedDupe = 0, unparsed = 0;
+    lines.forEach(line => {
+      const pair = parseLine(line);
+      if(!pair){ unparsed++; return; }
+      const exists = words.some(w => w.en.toLowerCase()===pair.en.toLowerCase() && w.nl.toLowerCase()===pair.nl.toLowerCase() && chapterOf(w)===chapter);
+      if(exists){ skippedDupe++; return; }
+      words.push({en: pair.en, nl: pair.nl, chapter});
+      added++;
+    });
+
+    if(added > 0){
+      document.getElementById('bulkInput').value = '';
+      save();
+      order = [];
+      render();
+    }
+
+    if(unparsed > 0 && added === 0){
+      addStatus.className = 'ocr-status error';
+      addStatus.textContent = `No lines recognized (${unparsed} line(s) skipped). Use the format "dutch - english" per line.`;
+    } else if(added === 0 && skippedDupe > 0){
+      addStatus.className = 'ocr-status error';
+      addStatus.textContent = `All ${skippedDupe} word(s) are already on the board for this chapter.`;
+    } else {
+      addStatus.className = 'ocr-status done';
+      let msg = `${added} word(s) added.`;
+      if(unparsed > 0) msg += ` ${unparsed} line(s) not recognized.`;
+      if(skippedDupe > 0) msg += ` ${skippedDupe} already on the board.`;
+      addStatus.textContent = msg;
+    }
+  });
+
+  document.getElementById('clearAllBtn').addEventListener('click', () => {
+    if(confirm('Are you sure you want to clear all words?')){
+      words = [];
+      save();
+      order = [];
+      render();
+    }
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', async () => {
+    const exportStatus = document.getElementById('exportStatus');
+    if(words.length === 0){
+      exportStatus.className = 'ocr-status error';
+      exportStatus.textContent = 'No words to back up yet.';
+      return;
+    }
+    const text = words.map(w => `${w.nl} - ${w.en} [${chapterOf(w)}]`).join('\n');
+    try{
+      await navigator.clipboard.writeText(text);
+      exportStatus.className = 'ocr-status done';
+      exportStatus.textContent = `Copied ${words.length} words to clipboard. Paste them somewhere safe (Notes app, email to yourself, etc).`;
+    }catch(e){
+      bulkInputEl.value = text;
+      managePanel.classList.add('open');
+      manageToggle.classList.add('open');
+      exportStatus.className = 'ocr-status error';
+      exportStatus.textContent = 'Could not copy automatically — your words are in the text box above, select and copy manually.';
+    }
+  });
+
+  manageToggle.addEventListener('click', () => {
+    managePanel.classList.toggle('open');
+    manageToggle.classList.toggle('open');
+  });
+
+  flapCard.addEventListener('click', () => {
+    flipped = !flipped;
+    flapCard.classList.toggle('flipped', flipped);
+  });
+
+  document.getElementById('nextBtn').addEventListener('click', () => {
+    pos = (pos+1) % order.length;
+    flipped = false;
+    render();
+  });
+  document.getElementById('prevBtn').addEventListener('click', () => {
+    pos = (pos-1 + order.length) % order.length;
+    flipped = false;
+    render();
+  });
+  document.getElementById('shuffleBtn').addEventListener('click', () => {
+    buildOrder();
+    render();
+  });
+
+  document.getElementById('directionRow').addEventListener('click', (e) => {
+    const seg = e.target.closest('.seg');
+    if(!seg) return;
+    direction = seg.dataset.dir;
+    document.querySelectorAll('.seg').forEach(s => s.classList.remove('active'));
+    seg.classList.add('active');
+    buildOrder();
+    render();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if(practiceArea.style.display === 'none') return;
+    if(e.code === 'Space'){ e.preventDefault(); flipped = !flipped; flapCard.classList.toggle('flipped', flipped); }
+    else if(e.code === 'ArrowRight'){ pos = (pos+1) % order.length; flipped = false; render(); }
+    else if(e.code === 'ArrowLeft'){ pos = (pos-1+order.length) % order.length; flipped = false; render(); }
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>
